@@ -77,9 +77,7 @@ We model editing as:
 
 📌 This is not just empirical — it follows from diffusion theory:
 
-\[
-z_t = \sqrt{\alpha} z_0 + \sqrt{1-\alpha} \epsilon
-\]
+`z_t = sqrt(alpha) * z_0 + sqrt(1 - alpha) * epsilon`
 
 - high noise → low signal → weak identity constraint  
 - low noise → strong signal → limited editing  
@@ -296,12 +294,8 @@ We transformed a generative pipeline into an **interpretable system**.
 
 ## Code
 
-https://github.com/vozamhcak/genAI
+https://github.com/myavg/xai
 
 ```bash
 bash scripts/run_final_submission.sh
 ```
-Team
-Alexander — experiments
-Albert — pipelines & ablations
-Ekaterina — XAI framework
