@@ -1,0 +1,39 @@
+project_name: diffusion_face_editing
+run_name: auto
+output_root: outputs/final_submission
+
+data:
+  prepare: true
+  root_dir: data/celeba_download
+  output_dir: data/faces
+  split: train
+  num_images: 20
+  seed: 42
+  strategy: evenly_spaced
+  overwrite: true
+
+experiments:
+  baseline:
+    enabled: true
+    config: configs/baseline.yaml
+    output_subdir: baseline
+
+  prompt1_ablation:
+    enabled: true
+    config: configs/baseline.yaml
+    output_subdir: prompt1_ablation
+
+  multi_prompt:
+    enabled: true
+    config: configs/multi_prompt.yaml
+    output_subdir: multi_prompt
+
+  noise_edit_full:
+    enabled: true
+    config: configs/noise_edit_full.yaml
+    output_subdir: noise_edit_full
+
+report_assets:
+  enabled: true
+  source_results: multi_prompt
+  output_subdir: report_assets

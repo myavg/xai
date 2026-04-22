@@ -1,11 +1,13 @@
-#!/usr/bin/env bash
-set -e
+#!/usr/bin/env sh
+set -eu
+
+CONFIG="${1:-configs/baseline.yaml}"
+INPUT_DIR="${2:-data/faces}"
+OUTPUT_DIR="${3:-outputs/prompt1_ablation}"
+
+mkdir -p "$OUTPUT_DIR"
 
 python src/run_prompt1_ablation.py \
-  --config configs/baseline.yaml \
-  --input_dir data/faces \
-  --output_dir results/prompt1_ablation \
-  --strengths 0.3,0.5,0.6,0.7 \
-  --guidance_scales 5.0,7.5,10.0
-
-echo "Done. Check results/prompt1_ablation/summary_prompt1.json"
+  --config "$CONFIG" \
+  --input_dir "$INPUT_DIR" \
+  --output_dir "$OUTPUT_DIR"

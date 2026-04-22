@@ -1,0 +1,49 @@
+{
+  "model_id": "runwayml/stable-diffusion-v1-5",
+  "num_inference_steps": 30,
+  "guidance_scale": 7.5,
+  "strengths": [
+    0.3,
+    0.5,
+    0.7
+  ],
+  "images_used": 20,
+  "prompts": [
+    {
+      "prompt_name": "bangs",
+      "run_name": "s0.30_g7.5",
+      "strength": 0.3,
+      "guidance_scale": 7.5,
+      "clip_mean": 0.23072648271918297,
+      "lpips_mean": 0.21020253077149392,
+      "ssim_mean": 0.761190008236749,
+      "tradeoff_score": 0.17817585002630948,
+      "best_image_id": "face_03",
+      "best_image_path": "bangs/s0.30_g7.5/edit_003.jpg"
+    },
+    {
+      "prompt_name": "glasses",
+      "run_name": "s0.30_g7.5",
+      "strength": 0.3,
+      "guidance_scale": 7.5,
+      "clip_mean": 0.24171194508671762,
+      "lpips_mean": 0.20798369199037553,
+      "ssim_mean": 0.7621986922416271,
+      "tradeoff_score": 0.18971602208912375,
+      "best_image_id": "face_12",
+      "best_image_path": "glasses/s0.30_g7.5/edit_012.jpg"
+    },
+    {
+      "prompt_name": "smile",
+      "run_name": "s0.30_g7.5",
+      "strength": 0.3,
+      "guidance_scale": 7.5,
+      "clip_mean": 0.24677122086286546,
+      "lpips_mean": 0.2035525619983673,
+      "ssim_mean": 0.7650178543202254,
+      "tradeoff_score": 0.19588308036327362,
+      "best_image_id": "face_01",
+      "best_image_path": "smile/s0.30_g7.5/edit_001.jpg"
+    }
+  ]
+}

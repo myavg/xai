@@ -1,0 +1,43 @@
+{
+  "input_dir": "outputs/final_submission/run_2026-04-13_12-25-21/multi_prompt",
+  "n_runs": 18,
+  "n_prompts": 3,
+  "best_per_prompt": [
+    {
+      "prompt_name": "bangs",
+      "edit_prompt": "a person with bangs, portrait, high quality",
+      "run_name": "s0.30_g7.5",
+      "strength": 0.3,
+      "guidance_scale": 7.5,
+      "clip_mean": 0.23028591945767402,
+      "lpips_mean": 0.20163892917335033,
+      "ssim_mean": 0.769176743842779,
+      "tradeoff_score": 0.17987618716433643,
+      "n_images": 20
+    },
+    {
+      "prompt_name": "glasses",
+      "edit_prompt": "a person wearing eyeglasses, portrait, high quality",
+      "run_name": "s0.50_g5.0",
+      "strength": 0.5,
+      "guidance_scale": 5.0,
+      "clip_mean": 0.2736091367900372,
+      "lpips_mean": 0.3123260661959648,
+      "ssim_mean": 0.6784104964747278,
+      "tradeoff_score": 0.19552762024104597,
+      "n_images": 20
+    },
+    {
+      "prompt_name": "smile",
+      "edit_prompt": "a smiling person, portrait, high quality",
+      "run_name": "s0.30_g5.0",
+      "strength": 0.3,
+      "guidance_scale": 5.0,
+      "clip_mean": 0.24533774107694625,
+      "lpips_mean": 0.2017322201281786,
+      "ssim_mean": 0.768700045151633,
+      "tradeoff_score": 0.1949046860449016,
+      "n_images": 20
+    }
+  ]
+}

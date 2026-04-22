@@ -10,32 +10,12 @@ import pandas as pd
 from PIL import Image, ImageDraw, ImageFont
 
 
-def parse_args():
-    parser = argparse.ArgumentParser(description="Prepare report-ready assets from multi-prompt results.")
-    parser.add_argument(
-        "--results_dir",
-        type=str,
-        default="results/multi_prompt_full",
-        help="Directory with multi-prompt results.",
-    )
-    parser.add_argument(
-        "--input_dir",
-        type=str,
-        default="data/faces",
-        help="Directory with original input face images.",
-    )
-    parser.add_argument(
-        "--output_dir",
-        type=str,
-        default=None,
-        help="Output folder. Default: <results_dir>/for_report",
-    )
-    parser.add_argument(
-        "--top_k",
-        type=int,
-        default=3,
-        help="How many best examples to keep per prompt.",
-    )
+def parse_args() -> argparse.Namespace:
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--results_dir", type=str, default="outputs/multi_prompt")
+    parser.add_argument("--input_dir", type=str, default="data/faces")
+    parser.add_argument("--output_dir", type=str, default=None)
+    parser.add_argument("--top_k", type=int, default=3)
     return parser.parse_args()
 
 
@@ -44,17 +24,16 @@ def load_json(path: str) -> Dict:
         return json.load(f)
 
 
-def ensure_dir(path: str):
+def ensure_dir(path: str) -> None:
     os.makedirs(path, exist_ok=True)
 
 
-def copy_if_exists(src: str, dst: str):
+def copy_if_exists(src: str, dst: str) -> None:
     if os.path.exists(src):
         shutil.copy2(src, dst)
 
 
 def get_font(size: int = 20):
-    # Try a few common fonts, otherwise fallback.
     candidates = [
         "/System/Library/Fonts/Supplemental/Arial.ttf",
         "/System/Library/Fonts/Supplemental/Helvetica.ttc",
@@ -69,12 +48,10 @@ def get_font(size: int = 20):
     return ImageFont.load_default()
 
 
-def draw_text(draw: ImageDraw.ImageDraw, xy: Tuple[int, int], text: str, font, fill=(255, 255, 255)):
+def draw_text(draw: ImageDraw.ImageDraw, xy: Tuple[int, int], text: str, font, fill=(255, 255, 255)) -> None:
     x, y = xy
-    # simple shadow for readability
-    shadow = (0, 0, 0)
     for dx, dy in [(-1, -1), (1, 1), (1, -1), (-1, 1)]:
-        draw.text((x + dx, y + dy), text, font=font, fill=shadow)
+        draw.text((x + dx, y + dy), text, font=font, fill=(0, 0, 0))
     draw.text((x, y), text, font=font, fill=fill)
 
 
@@ -91,12 +68,9 @@ def make_labeled_tile(image: Image.Image, title: str, subtitle: str = "", width:
     canvas.paste(image, (0, title_h + subtitle_h + pad * 2))
 
     draw = ImageDraw.Draw(canvas)
-    title_font = get_font(20)
-    subtitle_font = get_font(15)
-    draw_text(draw, (10, 8), title, title_font)
+    draw_text(draw, (10, 8), title, get_font(20))
     if subtitle:
-        draw_text(draw, (10, 38), subtitle, subtitle_font)
-
+        draw_text(draw, (10, 38), subtitle, get_font(15))
     return canvas
 
 
@@ -124,7 +98,7 @@ def vstack(images: List[Image.Image], bg=(255, 255, 255), gap: int = 16) -> Imag
 
 def grid(images: List[Image.Image], ncols: int, bg=(255, 255, 255), gap: int = 12) -> Image.Image:
     if not images:
-        raise ValueError("No images for grid.")
+        raise ValueError("No images for grid")
     nrows = math.ceil(len(images) / ncols)
     cell_w = max(im.width for im in images)
     cell_h = max(im.height for im in images)
@@ -156,7 +130,6 @@ def load_metrics(results_dir: str, prompt_name: str, run_name: str) -> Dict:
 
 
 def score_image(clip_score: float, lpips_score: float) -> float:
-    # Same spirit as run-level tradeoff, only per image.
     return float(clip_score - 0.25 * lpips_score)
 
 
@@ -182,15 +155,7 @@ def read_output_image(results_dir: str, prompt_name: str, run_name: str, idx: in
     return Image.open(path).convert("RGB")
 
 
-def make_best_gallery_for_prompt(
-    results_dir: str,
-    input_paths: List[str],
-    prompt_name: str,
-    best_run: str,
-    metrics: Dict,
-    out_path: str,
-    top_k: int,
-):
+def make_best_gallery_for_prompt(results_dir: str, input_paths: List[str], prompt_name: str, best_run: str, metrics: Dict, out_path: str, top_k: int) -> None:
     indices = select_top_indices(metrics, top_k=top_k)
     rows = []
 
@@ -203,23 +168,14 @@ def make_best_gallery_for_prompt(
         ssim_s = metrics["ssim_scores"][idx]
 
         left = make_labeled_tile(inp, f"{prompt_name} | input #{idx}")
-        right = make_labeled_tile(
-            out,
-            f"{prompt_name} | {best_run}",
-            f"CLIP={clip_s:.3f}  LPIPS={lpips_s:.3f}  SSIM={ssim_s:.3f}",
-        )
+        right = make_labeled_tile(out, f"{prompt_name} | {best_run}", f"CLIP={clip_s:.3f} LPIPS={lpips_s:.3f} SSIM={ssim_s:.3f}")
         rows.append(hstack([left, right]))
 
     collage = vstack(rows)
     collage.save(out_path)
 
 
-def make_single_best_overview(
-    results_dir: str,
-    input_paths: List[str],
-    best_df: pd.DataFrame,
-    out_path: str,
-):
+def make_single_best_overview(results_dir: str, input_paths: List[str], best_df: pd.DataFrame, out_path: str) -> None:
     rows = []
     for _, row in best_df.iterrows():
         prompt_name = row["prompt_name"]
@@ -231,23 +187,13 @@ def make_single_best_overview(
         out = read_output_image(results_dir, prompt_name, best_run, idx)
 
         left = make_labeled_tile(inp, f"{prompt_name} | input #{idx}")
-        right = make_labeled_tile(
-            out,
-            f"{prompt_name} | {best_run}",
-            f"CLIP={row['clip_mean']:.3f}  LPIPS={row['lpips_mean']:.3f}  SSIM={row['ssim_mean']:.3f}",
-        )
+        right = make_labeled_tile(out, f"{prompt_name} | {best_run}", f"CLIP={row['clip_mean']:.3f} LPIPS={row['lpips_mean']:.3f} SSIM={row['ssim_mean']:.3f}")
         rows.append(hstack([left, right]))
     overview = vstack(rows)
     overview.save(out_path)
 
 
-def make_parameter_sweep_grid(
-    results_dir: str,
-    input_paths: List[str],
-    all_runs_df: pd.DataFrame,
-    prompt_name: str,
-    out_path: str,
-):
+def make_parameter_sweep_grid(results_dir: str, input_paths: List[str], all_runs_df: pd.DataFrame, prompt_name: str, out_path: str) -> None:
     prompt_df = all_runs_df[all_runs_df["prompt_name"] == prompt_name].copy()
     prompt_df = prompt_df.sort_values(["strength", "guidance_scale"])
 
@@ -262,49 +208,43 @@ def make_parameter_sweep_grid(
     for _, row in prompt_df.iterrows():
         run_name = row["run_name"]
         out = read_output_image(results_dir, prompt_name, run_name, idx)
-        title = run_name
-        subtitle = (
-            f"C={row['clip_mean']:.3f} "
-            f"L={row['lpips_mean']:.3f} "
-            f"S={row['ssim_mean']:.3f}"
-        )
-        tiles.append(make_labeled_tile(out, title, subtitle))
+        subtitle = f"C={row['clip_mean']:.3f} L={row['lpips_mean']:.3f} S={row['ssim_mean']:.3f}"
+        tiles.append(make_labeled_tile(out, run_name, subtitle))
 
     g = grid(tiles, ncols=3)
     g.save(out_path)
 
 
-def make_failure_candidates(
-    results_dir: str,
-    input_paths: List[str],
-    best_df: pd.DataFrame,
-    out_path: str,
-):
+def make_failure_candidates(results_dir: str, input_paths: List[str], best_df: pd.DataFrame, out_path: str):
     rows = []
     for _, row in best_df.iterrows():
         prompt_name = row["prompt_name"]
         best_run = row["run_name"]
         best_metrics = load_metrics(results_dir, prompt_name, best_run)
 
-        # under-edit candidate = lowest CLIP in best run
         under_idx = int(min(range(len(best_metrics["clip_scores"])), key=lambda i: best_metrics["clip_scores"][i]))
 
-        # aggressive run = max strength, then max guidance
         aggressive_dir = os.path.join(results_dir, prompt_name)
-        run_names = sorted(os.listdir(aggressive_dir))
+        run_names = [
+            name
+            for name in os.listdir(aggressive_dir)
+            if os.path.isdir(os.path.join(aggressive_dir, name))
+            and name.startswith("s")
+            and "_g" in name
+        ]
+
         aggressive_run = sorted(
             run_names,
             key=lambda x: (
-                float(x.split("_")[0][1:]),  # strength
-                float(x.split("_")[1][1:]),  # guidance
+                float(x.split("_")[0][1:]),
+                float(x.split("_")[1][1:]),
             ),
             reverse=True,
         )[0]
+
         aggressive_metrics = load_metrics(results_dir, prompt_name, aggressive_run)
 
-        # over-edit = highest LPIPS in aggressive run
         over_idx = int(max(range(len(aggressive_metrics["lpips_scores"])), key=lambda i: aggressive_metrics["lpips_scores"][i]))
-        # artifact / identity drift proxy = lowest SSIM in aggressive run
         drift_idx = int(min(range(len(aggressive_metrics["ssim_scores"])), key=lambda i: aggressive_metrics["ssim_scores"][i]))
 
         triplet_specs = [
@@ -329,28 +269,25 @@ def make_failure_candidates(
     canvas.save(out_path)
 
 
-def write_report_notes(best_df: pd.DataFrame, output_path: str):
+def write_report_notes(best_df: pd.DataFrame, output_path: str) -> None:
     lines = []
-    lines.append("# Report notes\n")
-    lines.append("## Best setting per prompt\n")
+    lines.append("# Report notes")
+    lines.append("")
+    lines.append("## Best setting per prompt")
+    lines.append("")
     for _, row in best_df.iterrows():
-        lines.append(
-            f"- **{row['prompt_name']}**: {row['run_name']} | "
-            f"CLIP={row['clip_mean']:.4f}, LPIPS={row['lpips_mean']:.4f}, "
-            f"SSIM={row['ssim_mean']:.4f}, Tradeoff={row['tradeoff_score']:.4f}"
-        )
-
-    lines.append("\n## Short interpretation\n")
-    lines.append("- Mild settings worked best for smile/bangs if they preserve identity while still applying the edit.")
-    lines.append("- Glasses usually needs a stronger intervention than smile or bangs.")
-    lines.append("- Higher edit strength tends to improve CLIP alignment but also increases LPIPS drift and lowers SSIM.")
-    lines.append("- For a 2-page report, use only one table, one CLIP-vs-LPIPS plot, one best-examples figure, and one failure-cases figure.\n")
-
+        lines.append(f"- **{row['prompt_name']}**: {row['run_name']} | CLIP={row['clip_mean']:.4f}, LPIPS={row['lpips_mean']:.4f}, SSIM={row['ssim_mean']:.4f}, Tradeoff={row['tradeoff_score']:.4f}")
+    lines.append("")
+    lines.append("## Short interpretation")
+    lines.append("")
+    lines.append("- Mild settings work well when the edit must remain close to the original face.")
+    lines.append("- Glasses often needs stronger intervention than smile or bangs.")
+    lines.append("- Higher strength usually increases CLIP and LPIPS at the same time.")
     with open(output_path, "w", encoding="utf-8") as f:
         f.write("\n".join(lines))
 
 
-def main():
+def main() -> None:
     args = parse_args()
     results_dir = args.results_dir
     input_dir = args.input_dir
@@ -365,31 +302,22 @@ def main():
     overall_json = os.path.join(results_dir, "overall_summary_table.json")
 
     if not os.path.exists(best_csv):
-        raise FileNotFoundError(f"Missing {best_csv}")
+        raise FileNotFoundError(best_csv)
     if not os.path.exists(all_runs_csv):
-        raise FileNotFoundError(f"Missing {all_runs_csv}")
+        raise FileNotFoundError(all_runs_csv)
 
     best_df = pd.read_csv(best_csv)
     all_runs_df = pd.read_csv(all_runs_csv)
 
-    # Copy core artifacts
     copy_if_exists(best_csv, os.path.join(output_dir, "best_per_prompt.csv"))
     copy_if_exists(all_runs_csv, os.path.join(output_dir, "all_runs.csv"))
     copy_if_exists(plot_png, os.path.join(output_dir, "clip_vs_lpips.png"))
     copy_if_exists(overall_json, os.path.join(output_dir, "overall_summary_table.json"))
 
-    # Write concise notes
     write_report_notes(best_df, os.path.join(output_dir, "report_notes.md"))
 
-    # Best overview across prompts
-    make_single_best_overview(
-        results_dir=results_dir,
-        input_paths=input_paths,
-        best_df=best_df,
-        out_path=os.path.join(output_dir, "best_overview.png"),
-    )
+    make_single_best_overview(results_dir, input_paths, best_df, os.path.join(output_dir, "best_overview.png"))
 
-    # Per-prompt galleries and sweep grids
     for _, row in best_df.iterrows():
         prompt_name = row["prompt_name"]
         best_run = row["run_name"]
@@ -413,19 +341,9 @@ def main():
             out_path=os.path.join(output_dir, f"sweep_grid_{prompt_name}.png"),
         )
 
-    # Failure candidates
-    make_failure_candidates(
-        results_dir=results_dir,
-        input_paths=input_paths,
-        best_df=best_df,
-        out_path=os.path.join(output_dir, "failure_candidates.png"),
-    )
+    make_failure_candidates(results_dir, input_paths, best_df, os.path.join(output_dir, "failure_candidates.png"))
 
-    print("Prepared report assets in:")
     print(output_dir)
-    print("\nCreated files:")
-    for path in sorted(glob(os.path.join(output_dir, "*"))):
-        print(" -", os.path.basename(path))
 
 
 if __name__ == "__main__":

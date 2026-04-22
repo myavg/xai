@@ -7,24 +7,14 @@ import matplotlib.pyplot as plt
 import pandas as pd
 
 
-def parse_args():
-    parser = argparse.ArgumentParser(description="Summarize multi-prompt ablation results.")
-    parser.add_argument(
-        "--input_dir",
-        type=str,
-        default="results/multi_prompt_ablation",
-        help="Root directory with prompt subfolders and run metrics.json files.",
-    )
-    parser.add_argument(
-        "--output_dir",
-        type=str,
-        default=None,
-        help="Where to save summary files. Default: same as input_dir.",
-    )
+def parse_args() -> argparse.Namespace:
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--input_dir", type=str, default="outputs/multi_prompt")
+    parser.add_argument("--output_dir", type=str, default=None)
     return parser.parse_args()
 
 
-def main():
+def main() -> None:
     args = parse_args()
     input_dir = args.input_dir
     output_dir = args.output_dir or input_dir
@@ -78,15 +68,10 @@ def main():
     for prompt_name, group in df.groupby("prompt_name"):
         plt.scatter(group["lpips_mean"], group["clip_mean"], label=prompt_name)
         for _, row in group.iterrows():
-            plt.annotate(
-                row["run_name"],
-                (row["lpips_mean"], row["clip_mean"]),
-                fontsize=7,
-                alpha=0.8,
-            )
+            plt.annotate(row["run_name"], (row["lpips_mean"], row["clip_mean"]), fontsize=7, alpha=0.8)
 
-    plt.xlabel("LPIPS mean (lower = better preservation)")
-    plt.ylabel("CLIP mean (higher = better prompt alignment)")
+    plt.xlabel("LPIPS mean")
+    plt.ylabel("CLIP mean")
     plt.title("CLIP vs LPIPS across prompts and operating points")
     plt.legend()
     plt.tight_layout()
@@ -95,11 +80,7 @@ def main():
     plt.savefig(plot_path, dpi=200)
     plt.close()
 
-    print("Saved:")
-    print(f" - {all_runs_csv}")
-    print(f" - {best_csv}")
-    print(f" - {overall_json}")
-    print(f" - {plot_path}")
+    print(output_dir)
 
 
 if __name__ == "__main__":

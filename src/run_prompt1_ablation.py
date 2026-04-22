@@ -1,10 +1,8 @@
-"""Run a smile-edit parameter sweep and rank settings by CLIP/LPIPS trade-off."""
-
 import argparse
 import json
 import os
 from glob import glob
-from typing import Dict, List, Tuple
+from typing import Dict, List
 
 import lpips
 import open_clip
@@ -16,54 +14,39 @@ from torchvision import transforms
 
 
 def parse_args() -> argparse.Namespace:
-    """Parse CLI options for the Prompt-1 ablation run."""
-    parser = argparse.ArgumentParser(
-        description="Run Prompt 1 (smile) ablation for editability-preservation trade-off."
-    )
+    parser = argparse.ArgumentParser()
     parser.add_argument("--config", type=str, default="configs/baseline.yaml")
     parser.add_argument("--input_dir", type=str, default="data/faces")
-    parser.add_argument("--output_dir", type=str, default="results/prompt1_ablation")
-    parser.add_argument(
-        "--strengths",
-        type=str,
-        default="0.3,0.5,0.6,0.7",
-        help="Comma-separated list. Example: 0.3,0.5,0.6,0.7",
-    )
-    parser.add_argument(
-        "--guidance_scales",
-        type=str,
-        default="5.0,7.5,10.0",
-        help="Comma-separated list. Example: 5.0,7.5,10.0",
-    )
-    parser.add_argument(
-        "--max_images",
-        type=int,
-        default=None,
-        help="Override num_images from config if provided.",
-    )
+    parser.add_argument("--output_dir", type=str, default="outputs/prompt1_ablation")
+    parser.add_argument("--strengths", type=str, default="0.3,0.5,0.6,0.7")
+    parser.add_argument("--guidance_scales", type=str, default="5.0,7.5,10.0")
+    parser.add_argument("--max_images", type=int, default=None)
     return parser.parse_args()
 
 
 def load_config(path: str) -> Dict:
-    """Load YAML experiment configuration from disk."""
     with open(path, "r", encoding="utf-8") as f:
         return yaml.safe_load(f)
 
 
 def parse_float_list(raw: str) -> List[float]:
-    """Convert a comma-separated float string into a list."""
     return [float(x.strip()) for x in raw.split(",") if x.strip()]
 
 
 def pil_to_lpips_tensor(image: Image.Image) -> torch.Tensor:
-    """Convert PIL image to LPIPS input tensor in [-1, 1]."""
-    # LPIPS expects tensor in [-1, 1] with shape [N, C, H, W].
     tensor = transforms.ToTensor()(image).unsqueeze(0)
     return tensor * 2.0 - 1.0
 
 
+def collect_images(input_dir: str) -> List[str]:
+    patterns = ["*.jpg", "*.jpeg", "*.png"]
+    paths = []
+    for pattern in patterns:
+        paths.extend(glob(os.path.join(input_dir, pattern)))
+    return sorted(paths)
+
+
 def main() -> None:
-    """Generate edits across strength/guidance pairs and save ranked metrics."""
     args = parse_args()
     cfg = load_config(args.config)
 
@@ -77,28 +60,20 @@ def main() -> None:
     strengths = parse_float_list(args.strengths)
     guidance_scales = parse_float_list(args.guidance_scales)
 
-    image_paths = sorted(glob(os.path.join(args.input_dir, "*.jpg")))[:num_images]
+    image_paths = collect_images(args.input_dir)[:num_images]
     if not image_paths:
-        raise RuntimeError(
-            f"No input .jpg images found in {args.input_dir}. "
-            "Add images first (e.g., data/faces/*.jpg)."
-        )
+        raise RuntimeError(f"No input images found in {args.input_dir}")
 
     device = "cuda" if torch.cuda.is_available() else "cpu"
     dtype = torch.float16 if device == "cuda" else torch.float32
-    print(f"Device: {device}, images: {len(image_paths)}")
 
     os.makedirs(args.output_dir, exist_ok=True)
 
-    pipe = StableDiffusionImg2ImgPipeline.from_pretrained(
-        model_id,
-        torch_dtype=dtype,
-    ).to(device)
+    pipe = StableDiffusionImg2ImgPipeline.from_pretrained(model_id, torch_dtype=dtype).to(device)
     pipe.safety_checker = None
+    pipe.set_progress_bar_config(disable=True)
 
-    clip_model, _, clip_preprocess = open_clip.create_model_and_transforms(
-        "ViT-B-32", pretrained="openai"
-    )
+    clip_model, _, clip_preprocess = open_clip.create_model_and_transforms("ViT-B-32", pretrained="openai")
     clip_tokenizer = open_clip.get_tokenizer("ViT-B-32")
     clip_model = clip_model.to(device).eval()
 
@@ -120,10 +95,10 @@ def main() -> None:
             clip_scores: List[float] = []
             lpips_scores: List[float] = []
 
-            print(f"Running {run_name} ...")
             for i, path in enumerate(image_paths):
                 inp = Image.open(path).convert("RGB").resize((resolution, resolution))
                 generator = torch.Generator(device=device).manual_seed(seed + i)
+
                 out = pipe(
                     prompt=edit_prompt,
                     image=inp,
@@ -140,17 +115,14 @@ def main() -> None:
                     img = clip_preprocess(out).unsqueeze(0).to(device)
                     img_feat = clip_model.encode_image(img)
                     img_feat = img_feat / img_feat.norm(dim=-1, keepdim=True)
-                    clip_sim = (img_feat @ text_feat.T).item()
-                    clip_scores.append(float(clip_sim))
+                    clip_scores.append(float((img_feat @ text_feat.T).item()))
 
                     inp_lp = pil_to_lpips_tensor(inp).to(device)
                     out_lp = pil_to_lpips_tensor(out).to(device)
-                    lpips_val = lpips_model(inp_lp, out_lp).item()
-                    lpips_scores.append(float(lpips_val))
+                    lpips_scores.append(float(lpips_model(inp_lp, out_lp).item()))
 
             clip_mean = sum(clip_scores) / len(clip_scores)
             lpips_mean = sum(lpips_scores) / len(lpips_scores)
-            # Higher is better: maximize edit alignment while penalizing drift.
             tradeoff_score = clip_mean - 0.25 * lpips_mean
 
             run_metrics = {
@@ -185,13 +157,7 @@ def main() -> None:
     with open(summary_path, "w", encoding="utf-8") as f:
         json.dump(summary, f, indent=2)
 
-    best = summary["best_run"]
-    print("\nAblation complete.")
-    print(f"Saved summary: {summary_path}")
-    print(
-        f"Best run: {best['run_name']} | clip_mean={best['clip_mean']:.4f} | "
-        f"lpips_mean={best['lpips_mean']:.4f} | tradeoff={best['tradeoff_score']:.4f}"
-    )
+    print(summary_path)
 
 
 if __name__ == "__main__":

@@ -1,0 +1,4 @@
+prompt_name,edit_prompt,run_name,strength,guidance_scale,clip_mean,lpips_mean,ssim_mean,tradeoff_score,n_images
+bangs,"a person with bangs, portrait, high quality",s0.30_g7.5,0.3,7.5,0.23028591945767402,0.20163892917335033,0.769176743842779,0.17987618716433643,20
+glasses,"a person wearing eyeglasses, portrait, high quality",s0.50_g5.0,0.5,5.0,0.2736091367900372,0.3123260661959648,0.6784104964747278,0.19552762024104597,20
+smile,"a smiling person, portrait, high quality",s0.30_g5.0,0.3,5.0,0.24533774107694625,0.2017322201281786,0.768700045151633,0.1949046860449016,20
