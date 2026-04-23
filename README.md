@@ -3,55 +3,64 @@
 
 ## Introduction
 
-Diffusion models achieve impressive results in image editing, but they suffer from a critical limitation:
+Diffusion models have recently emerged as one of the most powerful approaches for image generation and editing, producing highly realistic and semantically consistent outputs. However, despite their impressive performance, they suffer from a fundamental limitation:
 
 > **We do not understand how edits are applied internally.**
 
-In face editing, this is especially important:
-- identity must be preserved  
-- changes must be localized  
-- unintended bias must be avoided  
+In face editing, this limitation becomes especially critical. Unlike general image generation, face editing requires strict control over identity and structure. Any unintended modification may distort identity, alter facial geometry, or introduce biases. Therefore, interpretability is not optional — it is essential.
 
-In this project, we extend a standard diffusion pipeline into an **Explainable AI (XAI) system** and study:
+In this project, we extend a standard diffusion-based editing pipeline into an **Explainable AI (XAI) system** and investigate the following research question:
 
-> **How editing parameters affect internal model behavior and interpretability**
+> **How do editing parameters affect internal model behavior and interpretability?**
+
+Our work is inspired by the idea that attention mechanisms inside diffusion models encode meaningful relationships between text and image regions, as demonstrated in *Prompt-to-Prompt Image Editing with Cross Attention Control* (Hertz et al., 2023). Instead of directly modifying attention, we use this insight to interpret model behavior indirectly.
 
 ---
 
 ## From Generation to Explanation
 
-Our baseline pipeline:
+Our baseline pipeline follows the standard diffusion editing procedure introduced in works such as *Denoising Diffusion Probabilistic Models* (Ho et al., 2020) and *Latent Diffusion Models* (Rombach et al., 2022):
 
 - image → latent encoding  
 - noise injection  
 - prompt-guided denoising  
 - edited image  
 
-From an XAI perspective, we reinterpret it as:
+In our implementation, we use **Stable Diffusion v1.5** (Rombach et al., 2022), a latent diffusion model that operates in a compressed latent space and is conditioned on text embeddings derived from CLIP (Radford et al., 2021).
+
+From an XAI perspective, we reinterpret the pipeline as:
+
 Text tokens → cross-attention → spatial regions
 
+This abstraction allows us to treat the model not just as a generator, but as a system that distributes influence across the image.
 
-Even though attention is not explicitly extracted, we treat:
+Even though attention maps are not explicitly extracted in our baseline, we interpret the final editing behavior as an **implicit attention distribution**.
 
-> **Editing behavior as an implicit attention distribution**
+As observed in our baseline analysis:
+- edits are inherently non-local  
+- parameters influence semantic behavior  
+- internal mechanisms remain hidden  
 
-As noted in our baseline :
-- edits are non-local  
-- parameters affect semantic behavior  
-- internal mechanisms are hidden  
+Our goal is to uncover and explain these hidden dynamics.
 
 ---
 
 ## Experimental Setup
 
-We perform controlled experiments:
+To systematically analyze the behavior of the model, we perform controlled experiments.
 
-- **3 edits**: smile, glasses, bangs  
-- **2 pipelines**:
-  - img2img (reference)
-  - noise-first  
-- **27 configurations**
-- **540+ generated images**
+We consider three types of semantic edits:
+- **smile** — modifying facial expression  
+- **glasses** — adding a new object  
+- **bangs** — modifying hairstyle  
+
+These edits were chosen because they represent different types of transformations: continuous attribute changes versus discrete structural additions.
+
+We evaluate two pipelines:
+- **img2img (reference pipeline)** — the standard SDEdit-style approach (Meng et al., 2022)  
+- **noise-first pipeline** — a variant where noise is manually injected into the latent representation before denoising  
+
+We perform experiments across **27 parameter configurations**, generating more than **540 images**.
 
 ### Metrics (as XAI signals)
 
@@ -61,26 +70,44 @@ We perform controlled experiments:
 | LPIPS ↓ | perceptual change | degree of modification |
 | SSIM ↑ | structural similarity | identity preservation |
 
+CLIP (Radford et al., 2021) measures how well the generated image matches the text prompt.  
+LPIPS (Zhang et al., 2018) captures perceptual differences between images using deep features.  
+SSIM (Wang et al., 2004) measures structural similarity at the pixel level.
+
+From an XAI perspective, these metrics act as **proxies for internal model behavior**, allowing us to infer how the model balances semantic alignment and preservation.
+
 ---
 
 ## Core Hypothesis (XAI View)
 
-We model editing as:
+We model diffusion editing as a trade-off:
 
 > **Editability ↑ vs Preservation ↑**
 
-### Key idea:
+This trade-off is not merely empirical — it is grounded in diffusion theory (Ho et al., 2020).
 
-- Increasing noise → destroys original signal  
-- Model relies more on prompt  
-- → **attention spreads globally**
-
-📌 This is not just empirical — it follows from diffusion theory:
+The forward diffusion process can be written as:
 
 `z_t = sqrt(alpha) * z_0 + sqrt(1 - alpha) * epsilon`
 
-- high noise → low signal → weak identity constraint  
-- low noise → strong signal → limited editing  
+This equation shows that the noisy latent representation is a combination of:
+- the original signal  
+- Gaussian noise  
+
+As noise increases:
+- the contribution of the original image decreases  
+- the model relies more on the text prompt  
+
+This leads to a fundamental consequence:
+
+- high noise → weak identity constraint → strong edits  
+- low noise → strong identity constraint → limited edits  
+
+From an interpretability perspective, this implies:
+
+> **increasing noise leads to a broader and less localized distribution of influence across the image**
+
+We interpret this phenomenon as **attention spreading globally**, even without explicitly observing attention maps.
 
 ---
 
@@ -96,17 +123,20 @@ We model editing as:
 - **s = 0.6** → visible edits but identity distortion  
 - **s = 0.2** → near-perfect reconstruction  
 
+These results confirm that noise strength directly controls how much the model modifies the image.
+
 ### XAI Interpretation
 
-> Editing is inherently **non-local**
-
-Even simple edits affect:
-- face structure  
+Even simple edits affect multiple aspects of the image:
+- facial geometry  
 - background  
-- lighting  
+- illumination  
 
-This confirms that:
-> diffusion models distribute attention across the entire image
+This demonstrates that editing is inherently **non-local**.
+
+Rather than modifying a single region, the model redistributes information across the entire image.
+
+This behavior aligns with findings from diffusion-based editing literature (Meng et al., 2022; Hertz et al., 2023), where attention and latent interactions operate globally.
 
 ---
 
@@ -125,15 +155,17 @@ This confirms that:
 
 ### Key result
 
-- Increasing noise:
-  - CLIP ↑ (better alignment)
-  - LPIPS ↑ (more distortion)
+As noise increases:
+- CLIP increases, indicating stronger alignment with the prompt  
+- LPIPS increases, indicating stronger deviation from the input  
+
+This confirms the existence of a fundamental trade-off.
 
 ### XAI Conclusion
 
-> Stronger edits correspond to **broader attention spread** :contentReference[oaicite:1]{index=1}
+> Stronger edits correspond to **broader attention spread**
 
-The scatter plot becomes a **global explanation of model behavior**.
+The scatter plots provide a **global view of the model's behavior**, summarizing how different parameter configurations affect the balance between alignment and preservation.
 
 ---
 
@@ -151,24 +183,19 @@ The scatter plot becomes a **global explanation of model behavior**.
 
 ### Interpretation
 
-- **Smile / Bangs**
-  - continuous attributes  
-  - require small local changes  
+Different edits require different levels of intervention:
 
-- **Glasses**
-  - discrete object  
-  - requires stronger intervention  
+- **Smile and bangs** correspond to continuous changes and require only small perturbations  
+- **Glasses** require the introduction of a new object and therefore need stronger noise  
 
 ### XAI Insight
 
-> The model implicitly learns **semantic regions**
+This suggests that the model learns **implicit semantic regions** within the latent space:
+- mouth region for expressions  
+- hair region for hairstyle  
+- eye region for accessories  
 
-- mouth (smile)  
-- hair (bangs)  
-- eyes (glasses)  
-
-But:
-> these regions are not explicitly controlled → they emerge from attention
+These regions are not explicitly defined but emerge from the interaction between text conditioning and latent structure.
 
 ---
 
@@ -180,17 +207,17 @@ But:
 
 ### Observations
 
-- low noise → weak edits (localized)  
+- low noise → weak and localized edits  
 - medium noise → optimal balance  
 - high noise → global transformation  
 
 ### XAI Insight
 
-> Interpretability is maximized at **moderate noise**
+Interpretability is maximized at **moderate noise levels**, where:
+- the model retains sufficient information from the input  
+- while still being flexible enough to apply meaningful edits  
 
-Because:
-- enough freedom to edit  
-- enough structure to preserve identity  
+This aligns with the theoretical understanding of diffusion processes and their signal-to-noise dynamics.
 
 ---
 
@@ -200,11 +227,13 @@ Because:
 
 ### Result
 
-Both pipelines behave similarly.
+Both pipelines produce similar qualitative and quantitative behavior.
 
 ### XAI Conclusion
 
-> Interpretability is determined by the **latent space**, not the pipeline.
+> Interpretability is determined by the **latent space and noise level**, not by the specific pipeline implementation.
+
+This reinforces the idea that the observed trade-offs are intrinsic to the diffusion model itself.
 
 ---
 
@@ -222,24 +251,23 @@ Both pipelines behave similarly.
 
 ### Key insight
 
-> Failures correspond directly to **attention misalignment** :contentReference[oaicite:2]{index=2}
+Failures are not random.
+
+They correspond to **systematic misalignment between the model’s internal attention distribution and the intended edit**.
+
+This perspective connects failure modes directly to interpretability.
 
 ---
 
 ## Why This Matters for XAI
 
-Our experiments reveal:
+Our experiments demonstrate that:
 
-### 1. Diffusion models are inherently non-local
-- edits spread across the image  
-- difficult to control precisely  
+1. Diffusion models operate in a **non-local manner**, making precise control challenging  
+2. Noise level acts as a **control parameter for interpretability**  
+3. Standard metrics can be reinterpreted as **explanatory signals**  
 
-### 2. Noise controls interpretability
-- low noise → interpretable but weak  
-- high noise → strong but chaotic  
-
-### 3. Metrics become explanations
-- CLIP / LPIPS / SSIM describe internal behavior  
+This shifts the perspective from evaluation to understanding.
 
 ---
 
@@ -251,44 +279,47 @@ Our experiments reveal:
 - Optimal noise:
   - **0.3** for continuous edits  
   - **0.5** for structural edits  
-- LPIPS increases by **2×** when moving from low to high noise  
+- LPIPS increases by approximately **2×** between low and high noise  
 
 ### Qualitative
 
-- Moderate noise produces:
-  - visible edits  
-  - preserved identity  
-  - interpretable behavior  
+- Moderate noise produces visible and meaningful edits  
+- Identity is largely preserved  
+- Model behavior remains interpretable  
 
 ---
 
 ## Final Conclusion
 
-We transformed a generative pipeline into an **interpretable system**.
+We transformed a generative diffusion pipeline into an interpretable system.
 
 ### Main findings:
 
-1. **Noise strength is the key driver of interpretability**
-2. **Editing behavior reflects attention distribution**
-3. **Different prompts activate different semantic regions**
-4. **Failures correspond to attention misalignment**
+1. Noise strength is the primary factor controlling interpretability  
+2. Editing behavior reflects an implicit attention distribution  
+3. Different prompts activate different semantic regions  
+4. Failure modes correspond to attention misalignment  
 
 ---
 
 ## XAI Takeaway
 
-> Diffusion models are not just black boxes —  
-> they are **structured systems where interpretability emerges from noise and attention dynamics**
+> Diffusion models are not purely black-box systems.  
+> Their behavior follows structured patterns that can be understood through noise and attention dynamics.
 
 ---
 
-## Future Work
+## References
 
-- extract real attention maps  
-- apply Prompt-to-Prompt control  
-- add identity metrics (ArcFace)  
-- fairness analysis on CelebA  
-- adaptive parameter tuning  
+- Ho, J., Jain, A., & Abbeel, P. (2020). *Denoising Diffusion Probabilistic Models*.  
+- Rombach, R. et al. (2022). *High-Resolution Image Synthesis with Latent Diffusion Models*.  
+- Meng, C. et al. (2022). *SDEdit: Guided Image Synthesis and Editing*.  
+- Hertz, A. et al. (2023). *Prompt-to-Prompt Image Editing with Cross Attention Control*.  
+- Mokady, R. et al. (2023). *Null-text Inversion for Editing Real Images*.  
+- Brooks, T. et al. (2023). *InstructPix2Pix*.  
+- Radford, A. et al. (2021). *CLIP*.  
+- Zhang, R. et al. (2018). *LPIPS*.  
+- Wang, Z. et al. (2004). *SSIM*.  
 
 ---
 
@@ -298,4 +329,3 @@ https://github.com/myavg/xai
 
 ```bash
 bash scripts/run_final_submission.sh
-```
